@@ -1,0 +1,6 @@
+2024-10-26 09:34:32,799 - INFO - [collect_season_player_stats.py:233] - Starting NBA stats collection: years 2024-2024, type: regular season
+2024-10-26 09:34:32,799 - INFO - [collect_season_player_stats.py:165] - Starting collection of regular season stats from 2024 to 2024
+2024-10-26 09:34:32,799 - INFO - [collect_season_player_stats.py:95] - Fetching regular season stats for 2024
+2024-10-26 09:34:34,179 - INFO - [collect_season_player_stats.py:133] - Successfully fetched 657 records for 2024 regular season
+2024-10-26 09:34:34,179 - INFO - [collect_season_player_stats.py:185] - Successfully collected 657 total records
+2024-10-26 09:34:34,188 - INFO - [collect_season_player_stats.py:216] - Successfully saved data to nba_stats_output/regular_stats_20241026_093434.csv

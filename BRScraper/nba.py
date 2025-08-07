@@ -63,28 +63,90 @@ def get_stats(season, info='per_game', playoffs=False, rename=False):
     else:
         comp = 'leagues'
         
-    url_stats = ['https://www.basketball-reference.com/'+comp+'/NBA_'+str(season)+'_per_game.html', # pergame
-                'https://www.basketball-reference.com/'+comp+'/NBA_'+str(season)+'_totals.html', # total
-                'https://www.basketball-reference.com/'+comp+'/NBA_'+str(season)+'_advanced.html', # advanced
-                'https://www.basketball-reference.com/'+comp+'/NBA_'+str(season)+'_per_minute.html', # per 36 min
-                'https://www.basketball-reference.com/'+comp+'/NBA_'+str(season)+'_per_poss.html', # per 100 poss
-                ] 
+    # Construct URLs for different statistic types
+    url_stats = {
+        'per_game': f'https://www.basketball-reference.com/{comp}/NBA_{season}_per_game.html',
+        'totals': f'https://www.basketball-reference.com/{comp}/NBA_{season}_totals.html',
+        'advanced': f'https://www.basketball-reference.com/{comp}/NBA_{season}_advanced.html',
+        'per_36': f'https://www.basketball-reference.com/{comp}/NBA_{season}_per_minute.html',
+        'per_100': f'https://www.basketball-reference.com/{comp}/NBA_{season}_per_poss.html',
+    }
+
     try:
-        if info=='per_game':
-            df = pd.read_html(url_stats[0])[0]
-        elif info=='totals':
-            df = pd.read_html(url_stats[1])[0]
-        elif info=='advanced':
-            df = pd.read_html(url_stats[2])[0]
-            df = df.drop(['Unnamed: 24','Unnamed: 19'], axis=1).reset_index(drop=True)
-        elif info=='per_36':
-            df = pd.read_html(url_stats[3])[0]
-        elif info=='per_100':
-            df = pd.read_html(url_stats[4])[0]
-    except:
-        raise ValueError(str(season)+' is not a valid season.')
-            
-    df = df[(df['Player'].notna())&(df['Player']!='Player')&(df['Player']!='League Average')].drop(['Rk'], axis=1).reset_index(drop=True)
+        # Select the appropriate URL based on the 'info' parameter
+        url = url_stats[info]
+        
+        # Fetch the HTML content of the page
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an error for bad status codes
+        
+        # Parse the HTML content using BeautifulSoup
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Locate the table containing the statistics
+        table = soup.find('table')
+        if table is None:
+            raise ValueError(f"No table found on the page for season {season} and info '{info}'.")
+        
+        tbody = table.find('tbody')
+        if tbody is None:
+            raise ValueError(f"No table body found on the page for season {season} and info '{info}'.")
+        
+        # Extract all table rows
+        rows = tbody.find_all('tr')
+        
+        # Initialize a list to store player_ids
+        player_ids = []
+        
+        # Iterate over each row to extract the 'player_id'
+
+        for row in rows:
+            # Find the <td> element with 'data-stat' attribute 'name_display'
+            player_td = row.find('td', {'data-stat': 'name_display'})            
+            if not player_td:
+                player_td = row.find('td', {'data-stat': 'player'})
+
+            if player_td:
+                # Extract the player's name text
+                player_name = player_td.get_text(strip=True)
+                
+                player_id = player_td.get('data-append-csv', None)
+                # print(player_id)
+                if player_id:
+                    player_ids.append(player_id)
+            # else:
+            #     print(row)
+        
+        # Use pandas to read the table into a DataFrame
+        from io import StringIO
+        df = pd.read_html(StringIO(response.text))[0]
+        
+        # Filter the DataFrame to exclude rows where 'Player' is NaN, 'Player', or 'League Average'
+        df = df[(df['Player'].notna()) &
+                (df['Player'] != 'Player') &
+                (df['Player'] != 'League Average')].reset_index(drop=True)
+        
+        # Remove the original 'Rk' column
+        if 'Rk' in df.columns:
+            df = df.drop(['Rk'], axis=1)
+
+        df = df.drop(['Player'], axis=1)
+        df = df.drop(['Age'], axis=1)
+        df = df.drop(['FG%'], axis=1)
+        df = df.drop(['2P%'], axis=1)
+        df = df.drop(['3P%'], axis=1)
+        df = df.drop(['eFG%'], axis=1)
+        df = df.drop(['FT%'], axis=1)
+        
+        # remove player_ids
+        # Insert the 'player_id' column as the first column
+        # print(player_ids)
+        df.insert(0, 'player_id', player_ids)
+        
+    except requests.HTTPError as http_err:
+        raise ValueError(f"HTTP error occurred: {http_err}")
+    except Exception as e:
+        raise ValueError(f"An error occurred while fetching data for season {season}: {e}")
 
     if rename:
         cols = ['Player','Pos','Age','Tm','G','GS']
